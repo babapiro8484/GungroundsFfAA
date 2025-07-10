@@ -1,0 +1,207 @@
+-- ZerowGungrounds GUI 
+
+-- Anti Kick & Ban (basit)
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local old = mt.__namecall
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if method == "Kick" then
+        warn("Kick engellendi.")
+        return
+    end
+    return old(self, ...)
+end)
+
+-- Services
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+local cam = workspace.CurrentCamera
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- GUI oluşturma fonksiyonu
+local function CreateGUI()
+    local gui = Instance.new("ScreenGui", player.PlayerGui)
+    gui.Name = "ZerowGungrounds"
+    
+    local frame = Instance.new("Frame", gui)
+    frame.Size = UDim2.new(0, 240, 0, 300)
+    frame.Position = UDim2.new(0.05, 0, 0.1, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+    frame.BorderSizePixel = 0
+    
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.Text = "ZerowGungrounds"
+    title.TextColor3 = Color3.fromRGB(255, 0, 0)
+    title.TextScaled = true
+    title.BackgroundTransparency = 1
+    
+    -- Buton oluşturucu
+    local function createButton(text, yPos, callback)
+        local btn = Instance.new("TextButton", frame)
+        btn.Position = UDim2.new(0.1, 0, 0, yPos)
+        btn.Size = UDim2.new(0.8, 0, 0, 35)
+        btn.Text = text
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        btn.TextColor3 = Color3.fromRGB(255,255,255)
+        btn.MouseButton1Click:Connect(callback)
+        return btn
+    end
+    
+    return gui, createButton
+end
+
+-- Değişkenler
+local aimbot = false
+local esp = false
+local wallhack = false
+local speed = false
+local aimbotActive = false -- Ateş edildiğinde true olacak
+
+-- GUI oluştur
+local gui, createButton = CreateGUI()
+
+-- Aimbot butonu
+createButton("🎯 Aimbot", 50, function()
+    aimbot = not aimbot
+    if aimbot then
+        warn("Aimbot açıldı.")
+    else
+        warn("Aimbot kapandı.")
+    end
+end)
+
+-- ESP butonu
+createButton("👁️ ESP", 95, function()
+    esp = not esp
+    for _,v in pairs(Players:GetPlayers()) do
+        if v ~= player and v.Character then
+            for _, part in pairs(v.Character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    if esp and not part:FindFirstChild("ESP") then
+                        local box = Instance.new("BoxHandleAdornment", part)
+                        box.Name = "ESP"
+                        box.Size = part.Size
+                        box.Adornee = part
+                        box.AlwaysOnTop = true
+                        box.ZIndex = 5
+                        box.Transparency = 0.6
+                        box.Color3 = Color3.new(1,0,0)
+                    elseif not esp and part:FindFirstChild("ESP") then
+                        part.ESP:Destroy()
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Wallhack butonu
+createButton("🧱 WallHack", 140, function()
+    wallhack = not wallhack
+    local char = player.Character or player.CharacterAdded:Wait()
+    for _,v in pairs(char:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.CanCollide = not wallhack
+        end
+    end
+    for _,v in pairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") and v.Transparency >= 0.9 and v.CanCollide then
+            v.CanCollide = not wallhack
+        end
+    end
+end)
+
+-- Speedboost butonu
+createButton("⚡ Speed Boost", 185, function()
+    speed = not speed
+    local char = player.Character or player.CharacterAdded:Wait()
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = speed and 24 or 16
+    end
+end)
+
+-- GUI Toggle: RightShift
+UIS.InputBegan:Connect(function(key, gp)
+    if not gp and key.KeyCode == Enum.KeyCode.RightShift then
+        gui.Enabled = not gui.Enabled
+    end
+end)
+
+-- Aimbot sadece ateş edildiğinde çalışacak
+mouse.Button1Down:Connect(function()
+    if aimbot then
+        aimbotActive = true
+    end
+end)
+
+mouse.Button1Up:Connect(function()
+    aimbotActive = false
+end)
+
+RunService.RenderStepped:Connect(function()
+    if aimbot and aimbotActive then
+        local closest, minDist = nil, math.huge
+        for _, v in ipairs(Players:GetPlayers()) do
+            if v ~= player and v.Character and v.Character:FindFirstChild("Head") then
+                local headPos, visible = cam:WorldToScreenPoint(v.Character.Head.Position)
+                if visible then
+                    local dist = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(headPos.X, headPos.Y)).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        closest = v
+                    end
+                end
+            end
+        end
+        if closest and closest.Character and closest.Character:FindFirstChild("Head") then
+            cam.CFrame = CFrame.new(cam.CFrame.Position, closest.Character.Head.Position)
+        end
+    end
+end)
+
+-- Reset sonrası scriptin tekrar yüklenmesi için:
+local function onCharacterAdded(char)
+    local humanoid = char:WaitForChild("Humanoid")
+    
+    -- SpeedBoost resetlenmesin diye ayarla
+    humanoid.WalkSpeed = speed and 24 or 16
+    
+    -- Wallhack yeniden uygula
+    if wallhack then
+        for _,v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
+    end
+    
+    -- ESP yeniden uygula
+    if esp then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= player and plr.Character then
+                for _, part in pairs(plr.Character:GetChildren()) do
+                    if part:IsA("BasePart") and not part:FindFirstChild("ESP") then
+                        local box = Instance.new("BoxHandleAdornment", part)
+                        box.Name = "ESP"
+                        box.Size = part.Size
+                        box.Adornee = part
+                        box.AlwaysOnTop = true
+                        box.ZIndex = 5
+                        box.Transparency = 0.6
+                        box.Color3 = Color3.new(1,0,0)
+                    end
+                end
+            end
+        end
+    end
+end
+
+player.CharacterAdded:Connect(onCharacterAdded)
+if player.Character then
+    onCharacterAdded(player.Character)
+end
